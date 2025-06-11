@@ -1,3 +1,4 @@
+/***    includes    ***/ 
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,15 +6,23 @@
 #include <termios.h>
 #include <errno.h>
 
+/***    defines    ***/
+#define CTRL_KEY(k) ((k) & 0x1f)
+
+/***    data    ***/
 struct termios orig_termios;
 
-/*error handling*/
+/***    terminal    ***/
+//error handling
 void die(const char *s){
+    write(STDOUT_FILENO, "\x1b[2J", 4);//to ensure we dont get garbage over terminal if error in rendering
+    write(STDOUT_FILENO, "\x1b[H", 3);
+
     perror(s);
     exit(1);
 }
 
-/*to be kind to the user. Resets terminal attributes*/
+//to be kind to the user. Resets terminal attributes
 void disableRawMode(){
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
         die("tcsetattr");
@@ -47,22 +56,43 @@ void enableRawMode(){
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 }
 
+char editorReadKey(){
+    int nread;
+    char c;
+
+    while((nread = read(STDIN_FILENO, &c, 1)) != 1){
+        if(nread == -1 && errno != EAGAIN) die("read");
+    }
+
+    return c;
+}
+/***    output  ***/
+void editorRefreshScreen(){
+    write(STDOUT_FILENO, "\x1b[2J", 4);//clear the terminal to the left side of the cursor
+    write(STDOUT_FILENO, "\x1b[H", 3);//to position the cursor at the top left corner
+}
+
+/***    input   ***/
+void editorProcessKeypress(){
+    char c = editorReadKey();
+
+    switch (c){
+        case CTRL_KEY('q'):
+            write(STDOUT_FILENO, "\x1b[2J", 4);//clear and reposition cursor upon exit
+            write(STDOUT_FILENO, "\x1b[H", 3);
+            exit(0);
+            break;
+    }
+}
+
+/***    init    ***/
 int main(){
     enableRawMode();
 
     while (1) {
-        char c = '\0';
-        if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) die("read");//read 1 byte at a time into char c
-
-        if (iscntrl(c)){//iscntrl checks if input is a control command, i.e. like ctrl C (these are more than 1 byte)
-        printf("%d\r\n", c);
-        } 
-
-        else{
-        printf("%d ('%c')\r\n", c, c);
-        }
-
-        if (c == 'q') break;
+        editorRefreshScreen();
+        editorProcessKeypress();
     }
+    
     return 0;
 }
