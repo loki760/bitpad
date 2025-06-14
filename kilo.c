@@ -6,6 +6,7 @@
 #include <termios.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+#include <string.h>
 
 /***    defines    ***/
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -128,29 +129,59 @@ int getWindowSize(int *rows, int *cols)
         return 0;
     }
 }
+/***    append buffer   ***/
+struct abuf
+{
+    char *b;
+    int len;
+};
+
+#define ABUF_INIT {NULL, 0}
+
+void abAppend(struct abuf *ab, const char *s, int len)
+{
+    char *new = realloc(ab->b, ab->len + len);
+
+    if (new == NULL)
+        return;
+
+    memcpy(&new[ab->len], s, len);
+
+    ab->b = new;
+    ab->len += len;
+}
+
+void abFree(struct abuf *ab)
+{
+    free(ab->b);
+}
+
 /***    output  ***/
-void editorDrawRows() // draw ~ like vim
+void editorDrawRows(struct abuf *ab) // draw ~ like vim
 {
     int y;
     for (y = 0; y < E.screenrows; y++)
     {
-        write(STDOUT_FILENO, "~", 1); // splite the process into 3 bytes (~,\r,\n)
+        abAppend(ab, "~", 1); // splite the process into 3 bytes (~,\r,\n)
 
         if (y < E.screenrows - 1) // this will ensure terminal doesnt do the last \r\n.
         {
-            write(STDOUT_FILENO, "\r\n", 2);
+            abAppend(ab, "\r\n", 2);
         }
     }
 }
 
 void editorRefreshScreen()
 {
-    write(STDOUT_FILENO, "\x1b[2J", 4); // clear the terminal to the left side of the cursor
-    write(STDOUT_FILENO, "\x1b[H", 3);  // to position the cursor at the top left corner
+    struct abuf ab = ABUF_INIT;
 
-    editorDrawRows();
+    abAppend(&ab, "\x1b[2J", 4); // clear the terminal to the left side of the cursor
+    abAppend(&ab, "\x1b[H", 3);  // to position the cursor at the top left corner
 
-    write(STDOUT_FILENO, "\x1b[H", 3); //\x1b==esc
+    editorDrawRows(&ab);
+
+    write(STDOUT_FILENO, ab.b, ab.len); //\x1b==esc
+    abFree(&ab);
 }
 
 /***    input   ***/
