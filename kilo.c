@@ -11,7 +11,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 /***    data    ***/
-struct editorConfig
+struct editorConfig // terminal stats
 {
     int screenrows;
     int screencols;
@@ -83,28 +83,63 @@ char editorReadKey()
     return c;
 }
 
+int getCursorPosition(int *rows, int *cols) // fallback protocol to get terminal window size
+{
+    char buf[32];
+    unsigned int i = 0;
+
+    if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) // error handling
+        return -1;
+
+    while (i < sizeof(buf) - 1) // getting the escape sequence for size of terminal window
+    {
+        if (read(STDIN_FILENO, &buf[i], 1) != 1)
+            break;
+        if (buf[i] == 'R')
+            break;
+        i++;
+    }
+
+    buf[i] = '\0';
+
+    if (buf[0] != '\x1b' || buf[1] != '[') // error handling
+        return -1;
+    if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) // parsed the escape sequence returned to rows and cols
+        return -1;
+
+    return 0;
+}
+
 int getWindowSize(int *rows, int *cols)
 {
-    struct winsize ws;
+    struct winsize ws; //
 
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0)
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) // TIOCGWINZ = Terminal IO Control Get WINdow siZe; write isnto ws
     {
-        return -1;
+        if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12)
+            return -1; // sending the cursor to the bottom-right corner (right then down); 999 ensures ends
+        return getCursorPosition(rows, cols);
     }
     else
     {
         *cols = ws.ws_col;
         *rows = ws.ws_row;
+        // printf("Detected rows: %d, cols: %d\r\n", E.screenrows, E.screencols);
         return 0;
     }
 }
 /***    output  ***/
-void editorDrawRows()
+void editorDrawRows() // draw ~ like vim
 {
     int y;
     for (y = 0; y < E.screenrows; y++)
     {
-        write(STDOUT_FILENO, "~\r\n", 3);
+        write(STDOUT_FILENO, "~", 1); // splite the process into 3 bytes (~,\r,\n)
+
+        if (y < E.screenrows - 1) // this will ensure terminal doesnt do the last \r\n.
+        {
+            write(STDOUT_FILENO, "\r\n", 2);
+        }
     }
 }
 
@@ -136,13 +171,16 @@ void editorProcessKeypress()
 /***    init    ***/
 void initEditor()
 {
-    if (getWindowSize(&E.screencols, &E.screenrows) == -1)
+    if (getWindowSize(&E.screenrows, &E.screencols) == -1)
+    {
         die("getWindowSize");
+    }
 }
 
 int main()
 {
     enableRawMode();
+    initEditor();
 
     while (1)
     {
