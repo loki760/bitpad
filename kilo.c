@@ -15,6 +15,7 @@
 /***    data    ***/
 struct editorConfig // terminal stats
 {
+    int cx, cy;
     int screenrows;
     int screencols;
     struct termios orig_termios;
@@ -206,7 +207,10 @@ void editorRefreshScreen()
 
     editorDrawRows(&ab);
 
-    abAppend(&ab, "\x1b[H", 3);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1); // terminal uses 1-indexed values, thus updated cs,cy
+    abAppend(&ab, buf, strlen(buf));
+
     abAppend(&ab, "\x1b[?25h", 6); // set mode
 
     write(STDOUT_FILENO, ab.b, ab.len); //\x1b==esc
@@ -214,6 +218,25 @@ void editorRefreshScreen()
 }
 
 /***    input   ***/
+void editorMoveCursor(char key) // move cursor around with wsad
+{
+    switch (key)
+    {
+    case 'a':
+        E.cx--;
+        break;
+    case 'd':
+        E.cx++;
+        break;
+    case 'w':
+        E.cy--;
+        break;
+    case 's':
+        E.cy++;
+        break;
+    }
+}
+
 void editorProcessKeypress()
 {
     char c = editorReadKey();
@@ -225,12 +248,22 @@ void editorProcessKeypress()
         write(STDOUT_FILENO, "\x1b[H", 3);
         exit(0);
         break;
+
+    case 'w':
+    case 's':
+    case 'a':
+    case 'd':
+        editorMoveCursor(c); // function that uses wsad to move cursor around
+        break;
     }
 }
 
 /***    init    ***/
 void initEditor()
 {
+    E.cx = 0;
+    E.cy = 0;
+
     if (getWindowSize(&E.screenrows, &E.screencols) == -1)
     {
         die("getWindowSize");
