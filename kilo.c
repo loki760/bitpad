@@ -10,6 +10,7 @@
 
 /***    defines    ***/
 #define CTRL_KEY(k) ((k) & 0x1f)
+#define KILO_VERSION "0.0.1"
 
 /***    data    ***/
 struct editorConfig // terminal stats
@@ -138,7 +139,7 @@ struct abuf
 
 #define ABUF_INIT {NULL, 0}
 
-void abAppend(struct abuf *ab, const char *s, int len)
+void abAppend(struct abuf *ab, const char *s, int len) // append all write fncs to buffer
 {
     char *new = realloc(ab->b, ab->len + len);
 
@@ -151,7 +152,7 @@ void abAppend(struct abuf *ab, const char *s, int len)
     ab->len += len;
 }
 
-void abFree(struct abuf *ab)
+void abFree(struct abuf *ab) // destructor that deallocates dyn mem used by abuf
 {
     free(ab->b);
 }
@@ -162,9 +163,33 @@ void editorDrawRows(struct abuf *ab) // draw ~ like vim
     int y;
     for (y = 0; y < E.screenrows; y++)
     {
-        abAppend(ab, "~", 1); // splite the process into 3 bytes (~,\r,\n)
+        if (y == E.screenrows / 3)
+        {
+            char welcome[80];
 
-        if (y < E.screenrows - 1) // this will ensure terminal doesnt do the last \r\n.
+            int welcomelen = snprintf(welcome, sizeof(welcome), "Kilo editor -- version %s", KILO_VERSION); // printing the ver of kilo
+
+            if (welcomelen > E.screencols) // truncate len if terminal too small
+                welcomelen = E.screencols;
+
+            int padding = (E.screencols - welcomelen) / 2; // centering the msg
+            if (padding)
+            {
+                abAppend(ab, "~", 1);
+                padding--;
+            }
+            while (padding--) // printing it in the centre
+                abAppend(ab, " ", 1);
+            abAppend(ab, welcome, welcomelen);
+        }
+
+        else
+        {
+            abAppend(ab, "~", 1); // split the process into 3 bytes (~,\r,\n)
+        }
+
+        abAppend(ab, "\x1b[K", 3); // erase in line command. 0 is deafult. it will clear to the right of the cursor
+        if (y < E.screenrows - 1)  // this will ensure terminal doesnt do the last \r\n.
         {
             abAppend(ab, "\r\n", 2);
         }
@@ -175,10 +200,14 @@ void editorRefreshScreen()
 {
     struct abuf ab = ABUF_INIT;
 
-    abAppend(&ab, "\x1b[2J", 4); // clear the terminal to the left side of the cursor
-    abAppend(&ab, "\x1b[H", 3);  // to position the cursor at the top left corner
+    abAppend(&ab, "\x1b[?25l", 6); // reset mode
+    /*abAppend(&ab, "\x1b[2J", 4);   // clear the terminal to the left side of the cursor. we hv optimized this by clearing line wise at each refresh*/
+    abAppend(&ab, "\x1b[H", 3); // to position the cursor at the top left corner
 
     editorDrawRows(&ab);
+
+    abAppend(&ab, "\x1b[H", 3);
+    abAppend(&ab, "\x1b[?25h", 6); // set mode
 
     write(STDOUT_FILENO, ab.b, ab.len); //\x1b==esc
     abFree(&ab);
