@@ -18,6 +18,7 @@ enum editorKey // value 1000 to ensure no conflict with ordinary keypresses
     ARROW_RIGHT,
     ARROW_UP,
     ARROW_DOWN,
+    DEL_KEY,
     HOME_KEY,
     END_KEY,
     PAGE_UP,
@@ -116,6 +117,8 @@ int editorReadKey()
                     {
                     case '1':
                         return HOME_KEY; //<esc>[1~, <esc>[7~, <esc>[H, or <esc>OH
+                    case '3':
+                        return DEL_KEY; //<esc>[3~
                     case '4':
                         return END_KEY; //<esc>[4~, <esc>[8~, <esc>[F, or <esc>OF
                     case '5':
