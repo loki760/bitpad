@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include <sys/types.h>
 
 /***    defines    ***/
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -26,11 +27,19 @@ enum editorKey // value 1000 to ensure no conflict with ordinary keypresses
 };
 
 /***    data    ***/
+typedef struct erow // editor row
+{
+    int size;
+    char *chars;
+} erow;
+
 struct editorConfig // terminal stats
 {
     int cx, cy;
     int screenrows;
     int screencols;
+    int numrows;
+    erow row;
     struct termios orig_termios;
 };
 
@@ -215,6 +224,20 @@ int getWindowSize(int *rows, int *cols)
         return 0;
     }
 }
+
+/***    file i/o    ***/
+
+void editorOpen()
+{
+    char *line = "Hello World";
+    ssize_t linelen = 11; // signed size type. to represent number of bytes
+
+    E.row.size = linelen;
+    E.row.chars = malloc(linelen + 1);
+    memcpy(E.row.chars, line, linelen);
+    E.row.chars[linelen] = '\0';
+    E.numrows = 1;
+}
 /***    append buffer   ***/
 struct abuf
 {
@@ -248,29 +271,40 @@ void editorDrawRows(struct abuf *ab) // draw ~ like vim
     int y;
     for (y = 0; y < E.screenrows; y++)
     {
-        if (y == E.screenrows / 3)
+        if (y >= E.numrows) // wrapped to print msg in 1st line
         {
-            char welcome[80];
-
-            int welcomelen = snprintf(welcome, sizeof(welcome), "Kilo editor -- version %s", KILO_VERSION); // printing the ver of kilo
-
-            if (welcomelen > E.screencols) // truncate len if terminal too small
-                welcomelen = E.screencols;
-
-            int padding = (E.screencols - welcomelen) / 2; // centering the msg
-            if (padding)
+            if (y == E.screenrows / 3)
             {
-                abAppend(ab, "~", 1);
-                padding--;
+                char welcome[80];
+
+                int welcomelen = snprintf(welcome, sizeof(welcome), "Kilo editor -- version %s", KILO_VERSION); // printing the ver of kilo
+
+                if (welcomelen > E.screencols) // truncate len if terminal too small
+                    welcomelen = E.screencols;
+
+                int padding = (E.screencols - welcomelen) / 2; // centering the msg
+                if (padding)
+                {
+                    abAppend(ab, "~", 1);
+                    padding--;
+                }
+                while (padding--) // printing it in the centre
+                    abAppend(ab, " ", 1);
+                abAppend(ab, welcome, welcomelen);
             }
-            while (padding--) // printing it in the centre
-                abAppend(ab, " ", 1);
-            abAppend(ab, welcome, welcomelen);
+
+            else
+            {
+                abAppend(ab, "~", 1); // split the process into 3 bytes (~,\r,\n)
+            }
         }
 
         else
         {
-            abAppend(ab, "~", 1); // split the process into 3 bytes (~,\r,\n)
+            int len = E.row.size;
+            if (len > E.screencols)
+                len = E.screencols;
+            abAppend(ab, E.row.chars, len);
         }
 
         abAppend(ab, "\x1b[K", 3); // erase in line command. 0 is deafult. it will clear to the right of the cursor
@@ -369,6 +403,7 @@ void initEditor()
 {
     E.cx = 0;
     E.cy = 0;
+    E.numrows = 0;
 
     if (getWindowSize(&E.screenrows, &E.screencols) == -1)
     {
@@ -380,6 +415,7 @@ int main()
 {
     enableRawMode();
     initEditor();
+    editorOpen();
 
     while (1)
     {
