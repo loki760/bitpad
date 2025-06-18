@@ -1,4 +1,8 @@
 /***    includes    ***/
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -227,16 +231,29 @@ int getWindowSize(int *rows, int *cols)
 
 /***    file i/o    ***/
 
-void editorOpen()
+void editorOpen(char *filename)
 {
-    char *line = "Hello World";
-    ssize_t linelen = 11; // signed size type. to represent number of bytes
+    FILE *fp = fopen(filename, "r"); // open file in read mode
+    if (!fp)
+        die("fopen"); // error handling
 
-    E.row.size = linelen;
-    E.row.chars = malloc(linelen + 1);
-    memcpy(E.row.chars, line, linelen);
-    E.row.chars[linelen] = '\0';
-    E.numrows = 1;
+    char *line = NULL;
+    size_t linecap = 0;
+    ssize_t linelen;                        // signed size_t. it can return -1 when error
+    linelen = getline(&line, &linecap, fp); // parse file line by line
+    if (linelen != -1)
+    {
+        while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r')) // we're stripping carriage and newline cuz erow reps one line of text
+            linelen--;
+
+        E.row.size = linelen;
+        E.row.chars = malloc(linelen + 1);
+        memcpy(E.row.chars, line, linelen);
+        E.row.chars[linelen] = '\0';
+        E.numrows = 1;
+    }
+    free(line);
+    fclose(fp);
 }
 /***    append buffer   ***/
 struct abuf
@@ -273,7 +290,7 @@ void editorDrawRows(struct abuf *ab) // draw ~ like vim
     {
         if (y >= E.numrows) // wrapped to print msg in 1st line
         {
-            if (y == E.screenrows / 3)
+            if (E.numrows == 0 && y == E.screenrows / 3)
             {
                 char welcome[80];
 
@@ -411,11 +428,14 @@ void initEditor()
     }
 }
 
-int main()
+int main(int argc, char *argv[]) // argument count, argument vector(array of strings)
 {
     enableRawMode();
     initEditor();
-    editorOpen();
+    if (argc >= 2) // pass filename to view it after ./kilo
+    {
+        editorOpen(argv[1]);
+    }
 
     while (1)
     {
