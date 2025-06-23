@@ -1,0 +1,25 @@
+# Ignore compiled binaries
+kilo
+test
+
+# Ignore object files
+*.o
+
+# Ignore temporary/backup files
+*~
+*.tmp
+*.bak
+*.swp
+
+# Ignore text files used for testing or output
+test.txt
+test.c
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore core dumps
+core
+
+# Ignore dependency files (if generated)
+*.d
