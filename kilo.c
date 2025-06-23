@@ -16,6 +16,7 @@
 /***    defines    ***/
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define KILO_VERSION "0.0.1"
+#define KILO_TAB_STOP 8
 
 enum editorKey // value 1000 to ensure no conflict with ordinary keypresses
 {
@@ -34,7 +35,9 @@ enum editorKey // value 1000 to ensure no conflict with ordinary keypresses
 typedef struct erow // editor row
 {
     int size;
+    int rsize; // render size
     char *chars;
+    char *render;
 } erow;
 
 struct editorConfig // terminal stats
@@ -233,6 +236,35 @@ int getWindowSize(int *rows, int *cols)
 
 /***    row operations  ***/
 
+void editorUpdateRow(erow *row) // copy chars in render string
+{
+    int tabs = 0;
+    int j;
+
+    for (j = 0; j < row->size; j++)
+        if (row->chars[j] == '\t')
+            tabs++;
+
+    free(row->render);
+    row->render = malloc(row->size + tabs * (KILO_TAB_STOP - 1) + 1);
+
+    int idx = 0;
+    for (j = 0; j < row->size; j++)
+    {
+        if (row->chars[j] == '\t')
+        {
+            row->render[idx++] = ' ';
+            while (idx % KILO_TAB_STOP != 0)
+                row->render[idx++] = ' ';
+        }
+        else
+            row->render[idx++] = row->chars[j];
+    }
+
+    row->render[idx] = '\0';
+    row->rsize = idx;
+}
+
 void editorAppendRow(char *s, size_t len)
 {
     E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1)); // multiply the number of bytes each erow takes and multiply that by the number of rows
@@ -242,6 +274,11 @@ void editorAppendRow(char *s, size_t len)
     E.row[at].chars = malloc(len + 1);
     memcpy(E.row[at].chars, s, len);
     E.row[at].chars[len] = '\0';
+
+    E.row[at].rsize = 0;     // initialising rsize
+    E.row[at].render = NULL; // initialising render
+    editorUpdateRow(&E.row[at]);
+
     E.numrows++; // keep track of the no. of lines
 }
 
@@ -347,12 +384,12 @@ void editorDrawRows(struct abuf *ab) // draw ~ like vim
         }
         else
         {
-            int len = E.row[filerow].size - E.coloff;
+            int len = E.row[filerow].rsize - E.coloff;
             if (len < 0)
                 len = 0;
             if (len > E.screencols)
                 len = E.screencols;
-            abAppend(ab, &E.row[filerow].chars[E.coloff], len);
+            abAppend(ab, &E.row[filerow].render[E.coloff], len);
         }
         abAppend(ab, "\x1b[K", 3);
         if (y < E.screenrows - 1)
@@ -385,7 +422,7 @@ void editorRefreshScreen()
 }
 
 /***    input   ***/
-void editorMoveCursor(int key) // move cursor around with wsad
+void editorMoveCursor(int key)
 {
     erow *row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
     switch (key)
