@@ -23,3 +23,6 @@ core
 
 # Ignore dependency files (if generated)
 *.d
+
+# Ignore shell scripts
+gitpush.sh
