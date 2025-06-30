@@ -43,6 +43,7 @@ typedef struct erow // editor row
 struct editorConfig // terminal stats
 {
     int cx, cy;
+    int rx;
     int rowoff;
     int coloff;
     int screenrows;
@@ -219,7 +220,7 @@ int getWindowSize(int *rows, int *cols)
 {
     struct winsize ws; //
 
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) // TIOCGWINZ = Terminal IO Control Get WINdow siZe; write isnto ws
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) // TIOCGWINZ = Terminal IO Control Get WINdow siZe; write into ws
     {
         if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12)
             return -1; // sending the cursor to the bottom-right corner (right then down); 999 ensures ends
@@ -507,6 +508,7 @@ void initEditor()
 {
     E.cx = 0;
     E.cy = 0;
+    E.rx = 0;
     E.numrows = 0;
     E.rowoff = 0; // row
     E.coloff = 0;
