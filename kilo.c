@@ -12,6 +12,8 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <sys/types.h>
+#include <time.h>
+#include <stdarg.h>
 
 /***    defines    ***/
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -51,6 +53,8 @@ struct editorConfig // terminal stats
     int numrows;
     erow *row; // array to store multi lines
     char *filename;
+    char statusmsg[80];
+    time_t statusmsg_time;
     struct termios orig_termios;
 };
 
@@ -427,6 +431,19 @@ void editorDrawStatusBar(struct abuf *ab)
         }
     }
     abAppend(ab, "\x1b[m", 3); // esc seq that switches back to normal formatting
+    abAppend(ab, "\r\n", 2);   // space to display status message
+}
+
+void editorDrawMessageBar(struct abuf *ab)
+{
+    abAppend(ab, "\x1b[K", 3);
+    int msglen = strlen(E.statusmsg);
+
+    if (msglen > E.screencols)
+        msglen = E.screencols;
+
+    if (msglen && time(NULL) - E.statusmsg_time < 5) // status msg will dissapear 5s after key press
+        abAppend(ab, E.statusmsg, msglen);
 }
 
 void editorRefreshScreen()
@@ -441,6 +458,7 @@ void editorRefreshScreen()
 
     editorDrawRows(&ab);
     editorDrawStatusBar(&ab);
+    editorDrawMessageBar(&ab);
 
     char buf[32];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.cx - E.coloff) + 1); // terminal uses 1-indexed values, thus updated cs,cy
@@ -452,6 +470,14 @@ void editorRefreshScreen()
     abFree(&ab);
 }
 
+void editorSetStatusMessage(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(E.statusmsg, sizeof(E.statusmsg), fmt, ap);
+    va_end(ap);
+    E.statusmsg_time = time(NULL);
+}
 /***    input   ***/
 void editorMoveCursor(int key)
 {
@@ -556,11 +582,13 @@ void initEditor()
     E.coloff = 0;
     E.row = NULL;
     E.filename = NULL;
+    E.statusmsg[0] = '\0';
+    E.statusmsg_time = 0;
 
     if (getWindowSize(&E.screenrows, &E.screencols) == -1)
         die("getWindowSize");
 
-    E.screenrows -= 1; // to not draw anything on last line
+    E.screenrows -= 2; // status bar, status msg
 }
 
 int main(int argc, char *argv[]) // argument count, argument vector(array of strings)
@@ -571,6 +599,8 @@ int main(int argc, char *argv[]) // argument count, argument vector(array of str
     {
         editorOpen(argv[1]);
     }
+
+    editorSetStatusMessage("HELP: Ctl+Q = quit");
 
     while (1)
     {
