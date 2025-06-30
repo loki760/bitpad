@@ -50,6 +50,7 @@ struct editorConfig // terminal stats
     int screencols;
     int numrows;
     erow *row; // array to store multi lines
+    char *filename;
     struct termios orig_termios;
 };
 
@@ -287,6 +288,9 @@ void editorAppendRow(char *s, size_t len)
 
 void editorOpen(char *filename)
 {
+    free(E.filename);
+    E.filename = strdup(filename); // also allocates required amt of memory that u freed
+
     FILE *fp = fopen(filename, "r"); // open file in read mode
     if (!fp)
         die("fopen"); // error handling
@@ -393,11 +397,36 @@ void editorDrawRows(struct abuf *ab) // draw ~ like vim
             abAppend(ab, &E.row[filerow].render[E.coloff], len);
         }
         abAppend(ab, "\x1b[K", 3);
-        if (y < E.screenrows - 1)
+        abAppend(ab, "\r\n", 2);
+    }
+}
+
+void editorDrawStatusBar(struct abuf *ab)
+{
+    abAppend(ab, "\x1b[7m", 4); // esc seq that switches to inverted colours
+    char status[80], rstatus[80];
+    int len = snprintf(status, sizeof(status), "%.20s - %d lines", E.filename ? E.filename : "[No Name]", E.numrows); // no name
+    int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.cy + 1, E.numrows);                                      // line no.
+
+    if (len > E.screencols) // make sure name fits
+        len = E.screencols;
+
+    abAppend(ab, status, len);
+
+    while (len < E.screencols) // insert whitespace until screen edge
+    {
+        if (E.screencols - len == rlen)
         {
-            abAppend(ab, "\r\n", 2);
+            abAppend(ab, rstatus, rlen);
+            break;
+        }
+        else
+        {
+            abAppend(ab, " ", 1);
+            len++;
         }
     }
+    abAppend(ab, "\x1b[m", 3); // esc seq that switches back to normal formatting
 }
 
 void editorRefreshScreen()
@@ -411,6 +440,7 @@ void editorRefreshScreen()
     abAppend(&ab, "\x1b[H", 3); // to position the cursor at the top left corner
 
     editorDrawRows(&ab);
+    editorDrawStatusBar(&ab);
 
     char buf[32];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.cx - E.coloff) + 1); // terminal uses 1-indexed values, thus updated cs,cy
@@ -525,11 +555,12 @@ void initEditor()
     E.rowoff = 0; // row
     E.coloff = 0;
     E.row = NULL;
+    E.filename = NULL;
 
     if (getWindowSize(&E.screenrows, &E.screencols) == -1)
-    {
         die("getWindowSize");
-    }
+
+    E.screenrows -= 1; // to not draw anything on last line
 }
 
 int main(int argc, char *argv[]) // argument count, argument vector(array of strings)
