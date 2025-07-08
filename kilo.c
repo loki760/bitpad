@@ -301,6 +301,32 @@ void editorAppendRow(char *s, size_t len)
     E.numrows++; // keep track of the no. of lines
 }
 
+void editorRowInsertChar(erow *row, int at, int c) // at is index at which char is inserted
+{
+    if (at < 0 || at > row->size)
+        at = row->size;
+
+    row->chars = realloc(row->chars, row->size + 2); // +2 for null byte too
+    memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1);
+
+    row->size++;
+    row->chars[at] = c;
+
+    editorUpdateRow(row); // to update render and rsize
+}
+
+/***    editor operations   ***/
+
+void editorInsertChar(int c)
+{
+    if (E.cy == E.numrows) // cursor is on ~ line after EOF, need to append new row before inserting character
+    {
+        editorAppendRow("", 0);
+    }
+    editorRowInsertChar(&E.row[E.cy], E.cx, c);
+    E.cx++;
+}
+
 /***    file i/o    ***/
 
 void editorOpen(char *filename)
@@ -586,6 +612,10 @@ void editorProcessKeypress()
     case ARROW_LEFT:
     case ARROW_RIGHT:
         editorMoveCursor(c); // function that uses wsad to move cursor around
+        break;
+
+    default:
+        editorInsertChar(c); // for text editing as default
         break;
     }
 }
