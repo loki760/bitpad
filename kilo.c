@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <stdarg.h>
+#include <fcntl.h>
 
 /***    defines    ***/
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -330,6 +331,29 @@ void editorInsertChar(int c)
 
 /***    file i/o    ***/
 
+char *editorRowsToString(int *buflen)
+{
+    int totlen = 0;
+    int j;
+
+    for (j = 0; j < E.numrows; j++) // length of string to store row contents
+        totlen += E.row[j].size + 1;
+
+    *buflen = totlen;
+    char *buf = malloc(totlen);
+    char *p = buf;
+
+    for (j = 0; j < E.numrows; j++) // storing the content user entered into p
+    {
+        memcpy(p, E.row[j].chars, E.row[j].size);
+        p += E.row[j].size; // pointer points to end of row
+        *p = '\n';          // insert new line at end
+        p++;                // pointer moved to start new row
+    }
+
+    return buf;
+}
+
 void editorOpen(char *filename)
 {
     free(E.filename);
@@ -352,6 +376,23 @@ void editorOpen(char *filename)
 
     free(line);
     fclose(fp);
+}
+
+void editorSave() // mapped to ctl+s
+{
+    if (E.filename == NULL)
+        return;
+
+    int len;
+    char *buf = editorRowsToString(&len);
+
+    int fd = open(E.filename, O_RDWR | O_CREAT, 0644);
+
+    /*Saving users inputs to file he's provided*/
+    ftruncate(fd, len);
+    write(fd, buf, len);
+    close(fd);
+    free(buf);
 }
 /***    append buffer   ***/
 struct abuf
@@ -581,6 +622,10 @@ void editorProcessKeypress()
         write(STDOUT_FILENO, "\x1b[2J", 4); // clear and reposition cursor upon exit
         write(STDOUT_FILENO, "\x1b[H", 3);
         exit(0);
+        break;
+
+    case CTRL_KEY('s'):
+        editorSave();
         break;
 
     case HOME_KEY:
