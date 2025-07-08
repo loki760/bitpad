@@ -22,6 +22,7 @@
 
 enum editorKey // value 1000 to ensure no conflict with ordinary keypresses
 {
+    BACKSPACE = 127, // assigned ascii for better readabiity, actual rep is not readable
     ARROW_LEFT = 1000,
     ARROW_RIGHT,
     ARROW_UP,
@@ -571,6 +572,11 @@ void editorProcessKeypress()
 
     switch (c)
     {
+
+    case '\r':
+        // TO DO
+        break;
+
     case CTRL_KEY('q'):
         write(STDOUT_FILENO, "\x1b[2J", 4); // clear and reposition cursor upon exit
         write(STDOUT_FILENO, "\x1b[H", 3);
@@ -583,6 +589,12 @@ void editorProcessKeypress()
     case END_KEY:
         if (E.cy < E.numrows)
             E.cx = E.row[E.cy].size;
+        break;
+
+    case BACKSPACE:
+    case CTRL_KEY('h'):
+    case DEL_KEY:
+        /* TODO */
         break;
 
     case PAGE_UP:
@@ -612,6 +624,10 @@ void editorProcessKeypress()
     case ARROW_LEFT:
     case ARROW_RIGHT:
         editorMoveCursor(c); // function that uses wsad to move cursor around
+        break;
+
+    case CTRL_KEY('l'):
+    case '\x1b': // a redundancy for accidental esc sequences (they are being ignored)
         break;
 
     default:
