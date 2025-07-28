@@ -1,31 +1,36 @@
-# Kilo — A Minimal Text Editor in C
+# bitpad
 
-This is a small, fully functional text editor for the terminal, inspired by [kilo](https://viewsourcecode.org/snaptoken/kilo/index.html) by Salvatore Sanfilippo. It is built **from scratch in C**, using **raw terminal input**, with no dependencies other than the standard library and POSIX system calls.
+A minimal, fast, terminal-based text editor written in C — inspired by [kilo by antirez](https://github.com/antirez/kilo), but customized and extended.
+
+> Works on Linux and macOS, in any terminal. Perfect for learning how terminal editors work under the hood.
 
 ---
 
 ## Features
 
-- Raw mode terminal input (handles Ctrl keys, disables echo, etc.)
-- Cursor movement with arrow keys (WSAD-like navigation)
-- Page up/down, home/end support
-- Open and display files (line-by-line memory allocation)
-- Vertical scrolling and viewport control
-- Clean redraw and screen refresh with escape sequences
-- Exit with `Ctrl + Q`
-- Syntax highlighting and saving **not yet implemented**
+- Arrow key navigation
+- Status bar with filename and line number
+- Open and view text files
+- Cross-platform (Linux/macOS)
+- Raw terminal control with zero dependencies
 
 ---
 
-## Tech Details
+## Installation
 
-- Written in pure C (C89/C99 compatible)
-- Uses low-level POSIX APIs:
-  - `termios.h` for terminal control
-  - `read()` / `write()` for input/output
-  - `ioctl()` for screen size
-- Manual memory management (`malloc`, `free`)
-- No external libraries or dependencies
+### One-line install (Linux/macOS)
 
+```bash
+curl -sL https://github.com/loki760/bitpad/raw/main/install.sh | bash
+```
+### Build from source
+
+```bash
+git clone https://github.com/YOUR_USERNAME/kilo-editor.git
+cd kilo-editor
+make          # or: gcc kilo.c -o kilo
+./kilo        # run without a file
+./kilo file.txt  # open a file
+```
 
 
