@@ -54,6 +54,7 @@ struct editorConfig // terminal stats
     int screencols;
     int numrows;
     erow *row; // array to store multi lines
+    int dirty;
     char *filename;
     char statusmsg[80];
     time_t statusmsg_time;
@@ -304,6 +305,7 @@ void editorAppendRow(char *s, size_t len)
     editorUpdateRow(&E.row[at]);
 
     E.numrows++; // keep track of the no. of lines
+    E.dirty++;   // tracking changes made, incrementing for quantitativity
 }
 
 void editorRowInsertChar(erow *row, int at, int c) // at is index at which char is inserted
@@ -379,6 +381,7 @@ void editorOpen(char *filename)
 
     free(line);
     fclose(fp);
+    E.dirty = 0; // initialising doesnt count as a change
 }
 
 void editorSave() // mapped to ctl+s
@@ -400,6 +403,7 @@ void editorSave() // mapped to ctl+s
             {
                 close(fd);
                 free(buf);
+                E.dirty = 0; // reseting count of changes
                 editorSetStatusMessage("%d bytes written to disk", len);
                 return;
             }
@@ -512,8 +516,12 @@ void editorDrawStatusBar(struct abuf *ab)
 {
     abAppend(ab, "\x1b[7m", 4); // esc seq that switches to inverted colours
     char status[80], rstatus[80];
-    int len = snprintf(status, sizeof(status), "%.20s - %d lines", E.filename ? E.filename : "[No Name]", E.numrows); // no name
-    int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.cy + 1, E.numrows);                                      // line no.
+
+    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
+                       E.filename ? E.filename : "[No Name]", E.numrows,
+                       E.dirty ? "(modified)" : ""); // no name
+
+    int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.cy + 1, E.numrows); // line no.
 
     if (len > E.screencols) // make sure name fits
         len = E.screencols;
@@ -710,6 +718,7 @@ void initEditor()
     E.filename = NULL;
     E.statusmsg[0] = '\0';
     E.statusmsg_time = 0;
+    E.dirty = 0;
 
     if (getWindowSize(&E.screenrows, &E.screencols) == -1)
         die("getWindowSize");
