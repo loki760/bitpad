@@ -26,8 +26,8 @@ curl -sL https://github.com/loki760/bitpad/raw/main/install.sh | bash
 ### Build from source
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/kilo-editor.git
-cd kilo-editor
+git clone https://github.com/loki760/bitpad.git
+cd bitpad
 make          # or: gcc kilo.c -o kilo
 ./kilo        # run without a file
 ./kilo file.txt  # open a file
