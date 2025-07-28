@@ -20,6 +20,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define KILO_VERSION "0.0.1"
 #define KILO_TAB_STOP 8
+#define KILO_QUIT_TIMES 3
 
 enum editorKey // value 1000 to ensure no conflict with ordinary keypresses
 {
@@ -320,6 +321,19 @@ void editorRowInsertChar(erow *row, int at, int c) // at is index at which char 
     row->chars[at] = c;
 
     editorUpdateRow(row); // to update render and rsize
+}
+
+void editorRowDelChar(erow *row, int at)
+{
+    if (at < 0 || at >= row->size)
+        return;
+
+    memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
+    row->size--;
+
+    editorUpdateRow(row);
+
+    E.dirty++;
 }
 
 /***    editor operations   ***/
@@ -633,6 +647,7 @@ void editorMoveCursor(int key)
 
 void editorProcessKeypress()
 {
+    static int quit_times = KILO_QUIT_TIMES;
     int c = editorReadKey();
 
     switch (c)
@@ -643,6 +658,15 @@ void editorProcessKeypress()
         break;
 
     case CTRL_KEY('q'):
+        if (E.dirty && quit_times > 0) // to quit with unsaved changes, 3 ctl+q
+        {
+            editorSetStatusMessage("WARNING!!! File has unsaved changes. "
+                                   "Press Ctrl-Q %d more times to quit.",
+                                   quit_times);
+            quit_times--;
+            return;
+        }
+
         write(STDOUT_FILENO, "\x1b[2J", 4); // clear and reposition cursor upon exit
         write(STDOUT_FILENO, "\x1b[H", 3);
         exit(0);
@@ -703,6 +727,8 @@ void editorProcessKeypress()
         editorInsertChar(c); // for text editing as default
         break;
     }
+
+    quit_times = KILO_QUIT_TIMES; // if any other key press is encountered, reset.
 }
 
 /***    init    ***/
